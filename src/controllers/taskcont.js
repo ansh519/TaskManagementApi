@@ -11,12 +11,27 @@ const createTask = async (req, res) => {
 
 const getTasks = async (req, res) => {
     try {
-        const { status, dueDate, sort = 'createdAt' } = req.query;
+        const { status, dueDate, sort = 'createdAt', order = 'asc', page = 1, limit = 10 } = req.query;
+
         const filter = { userId: req.user.id };
         if (status) filter.status = status;
         if (dueDate) filter.dueDate = { $lte: new Date(dueDate) };
-        const tasks = await Task.find(filter).sort({ [sort]: 1 });
-        res.json(tasks);
+
+        const sortOrder = order === 'desc' ? -1 : 1;
+
+        const tasks = await Task.find(filter)
+            .sort({ [sort]: sortOrder })
+            .skip((page - 1) * parseInt(limit))
+            .limit(parseInt(limit));
+
+        const totalTasks = await Task.countDocuments(filter);
+
+        res.status(200).json({
+            tasks,
+            totalPages: Math.ceil(totalTasks / limit),
+            currentPage: parseInt(page),
+            totalTasks,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
